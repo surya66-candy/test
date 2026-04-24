@@ -22,6 +22,7 @@ async def get_current_user(
         # For now, we use the Supabase admin client to validate
         payload = jwt.decode(
             token,
+            key="",  # Key not needed when verify_signature is False
             options={"verify_signature": False},  # Supabase handles verification
             algorithms=["HS256"],
         )
