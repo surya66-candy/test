@@ -13,6 +13,7 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import useAuthStore from '../store/authStore';
+import { authApi } from '../services/api';
 
 const step1Schema = yup.object({
   full_name: yup.string().required('Full name is required'),
@@ -33,7 +34,7 @@ const steps = ['Personal Info', 'Club Details'];
 
 const RegisterPage = () => {
   const navigate = useNavigate();
-  const { signup, error, clearError } = useAuthStore();
+  const { login, error, clearError } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
@@ -51,12 +52,28 @@ const RegisterPage = () => {
   const handleStep2 = async (data) => {
     setLoading(true);
     clearError();
-    const result = await signup(step1Data.email, step1Data.password, {
-      full_name: step1Data.full_name,
-      club_name: data.club_name,
-    });
-    if (result.success) {
+    try {
+      // Call backend API to register user + create club + assign roles
+      await authApi.registerClub({
+        email: step1Data.email,
+        password: step1Data.password,
+        full_name: step1Data.full_name,
+        club_name: data.club_name,
+        club_description: data.club_description,
+        contact_email: data.contact_email || step1Data.email,
+      });
+
+      // Auto-login after successful registration
+      const loginResult = await login(step1Data.email, step1Data.password);
+      if (loginResult.success) {
+        navigate('/dashboard');
+        return;
+      }
+      // If auto-login fails, show success and redirect to login
       setSuccess(true);
+    } catch (error) {
+      const msg = error.response?.data?.detail || error.message || 'Registration failed';
+      useAuthStore.setState({ error: msg });
     }
     setLoading(false);
   };
@@ -77,7 +94,7 @@ const RegisterPage = () => {
           </Box>
           <Typography variant="h5" fontWeight={700} gutterBottom>Registration Successful!</Typography>
           <Typography color="text.secondary" sx={{ mb: 3 }}>
-            Please check your email to verify your account. You can then sign in to your club dashboard.
+            Your account and club have been created. You can now sign in.
           </Typography>
           <Button variant="contained" component={RouterLink} to="/login">Go to Login</Button>
         </Paper>
